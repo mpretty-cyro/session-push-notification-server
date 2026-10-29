@@ -9,7 +9,8 @@ The SPNS manages communication with three different parties:
 
 - Android or iOS Session clients (who have enabled "Fast Mode" message notifications)
 - The Oxen network's storage servers
-- The relevant service (Apple, Google, Huawei) to which the requested notifications will be pushed
+- The relevant service (Apple, Google, Huawei, or a UnifiedPush distributor) to which the requested
+  notifications will be pushed
 
 The Session clients (but only ones who have opted in to received messages) make an onion request to
 the SPNS to subscribe to notifications; it provides the notification type (e.g. "apns" for iOS), a
@@ -144,6 +145,10 @@ the systems into giving your the required magic tokens needed to connect with th
 are unhappy with this situation, no doubt Google and Apple management will be receptive to your
 suggestions as to how they might improve their systems.
 
+The UnifiedPush notifier is the exception: it needs only a VAPID key that you generate yourself
+with `./make-vapid-key.py`, and the Python packages `aiohttp`, `cryptography`, `http_ece` and
+`py_vapid` (Debian: `python3-aiohttp python3-cryptography python3-http-ece python3-py-vapid`).
+
 ## Running the server
 
 There are two supported modes of operation: an "all-in-one" that runs all the components under
@@ -172,6 +177,10 @@ would use:
 or for APNS:
 
     systemctl enable --now spns-notifier@apns.service
+
+or for UnifiedPush (which needs a VAPID key; see `[notify-unifiedpush]` in `spns.ini.example`):
+
+    systemctl enable --now spns-notifier@unifiedpush.service
 
 You can enable any number of services this way; each service corresponds to one of the notifier
 scripts in the spns/notifiers/ directory (e.g. spns/notifiers/firebase.py).

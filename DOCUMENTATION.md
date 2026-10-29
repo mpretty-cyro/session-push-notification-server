@@ -36,10 +36,11 @@ via a v4 onion request.  The onion req pubkey is: d7557fe563e2610de876c0ac7341b6
       as it isn't too large); if false then the body will not be included in notifications.
     - `sig_ts` -- the signature unix timestamp (seconds, not ms); see below.
     - `signature` -- the 64-byte Ed25519 signature; see below.
-    - `service` -- the string identifying the notification service, such as "apns" or "firebase".
+    - `service` -- the string identifying the notification service, such as "apns", "firebase" or
+      "unifiedpush".
     - `service_info` -- dict of service-specific data; typically this includes just a "token" field
-      with a device-specific token, but different services in the future may have different input
-      requirements.
+      with a device-specific token, but different services may have different input requirements
+      (see UnifiedPush, below).
     - `enc_key` -- 32-byte encryption key; notification payloads sent to the device will be encrypted
       with XChaCha20-Poly1305 using this key.  Though it is permitted for this to change, it is
       recommended that the device generate this once and persist it.
@@ -133,3 +134,39 @@ via a v4 onion request.  The onion req pubkey is: d7557fe563e2610de876c0ac7341b6
 - For Android, the subscription request uses `"service": "firebase"`, and the request data is the
   same as iOS except with the Apple-specific `"aps"` key omitted (that is: it has the `enc_payload`
   and `spns` keys, as described above).
+
+- For Android devices without Google services, the subscription request can use
+  `"service": "unifiedpush"`.  The device registers with whichever UnifiedPush distributor app the
+  user has installed (ntfy, NextPush, Gotify, an FCM-backed distributor, ...) and gets back a push
+  endpoint URL plus a Web Push keypair; it subscribes with:
+
+        "service_info": {
+            "endpoint": "https://ntfy.example.org/upAbCdEf123456?up=1",
+            "p256dh": "BASE64URL...",
+            "auth": "BASE64URL..."
+        }
+
+  - `endpoint` -- the push endpoint URL from the distributor.  Must be `https://` with a public DNS
+    host name (no IP addresses, no credentials or fragment, at most 2048 characters).  The
+    subscription is identified by the endpoint, the way other services are identified by their
+    token: re-subscribing with the same endpoint and new keys updates the keys.
+  - `p256dh` -- the device's 65-byte uncompressed P-256 public key, base64url (padded or not;
+    standard base64 is also accepted).
+  - `auth` -- the device's 16-byte auth secret, base64url.
+
+  When registering with the distributor the app should pass the push server's VAPID public key (the
+  `vapid` registration extra): some distributors refuse to register without one.  An unsubscribe
+  request must pass the same `service_info`.
+
+  Notifications arrive as Web Push messages (RFC 8030), encrypted to `p256dh`/`auth` with RFC 8291
+  (`aes128gcm`), with `Urgency: high`.  Once decrypted (UnifiedPush connector libraries do this) the
+  body is the JSON encoding of the same data map that an FCM message carries:
+
+        {"enc_payload":"...","spns":"1"}
+
+  so it can be parsed into a string map and handed to the code that handles an FCM data message.
+  The encrypted body is always within the 4096 bytes distributors accept; if the message data would
+  take it over, the data is left out and flagged with `"B": true` just as for a message over 2500
+  bytes.  If the push service reports the endpoint gone (HTTP 404 or 410) the push server drops
+  every subscription using it, so the app should re-subscribe whenever its distributor gives it a
+  new endpoint.

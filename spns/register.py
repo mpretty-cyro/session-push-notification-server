@@ -42,15 +42,24 @@ def subscribe():
       as it isn't too large); if false then the body will not be included in notifications.
     - sig_ts -- the signature unix timestamp (seconds, not ms); see below.
     - signature -- the 64-byte Ed25519 signature; see below.
-    - service -- the string identifying the notification service, such as "apns" or "firebase".
+    - service -- the string identifying the notification service, such as "apns", "firebase" or
+      "unifiedpush".
     - service_info -- dict of service-specific data; typically this includes a "token" field with a
-      device-specific token, but different services may have different input requirements.
+      device-specific token, but different services may have different input requirements:
+      - "apns", "apns-sandbox", "firebase", "huawei": `{"token": "..."}`
+      - "unifiedpush": `{"endpoint": "https://...", "p256dh": "...", "auth": "..."}` where
+        `endpoint` is the https push endpoint URL from the device's UnifiedPush distributor, and
+        `p256dh` and `auth` are the device's Web Push keys (RFC 8291), base64url-encoded: a 65-byte
+        uncompressed P-256 public key and a 16-byte auth secret.  The endpoint must be https with a
+        public DNS host name.
     - enc_key -- 32-byte encryption key; notification payloads sent to the device will be encrypted
       with XChaCha20-Poly1305 using this key.
 
     Notification subscriptions are unique per pubkey/service/service_token which means that
     re-subscribing with the same pubkey/service/token renews (or updates, if there are changes in
-    other parameters such as the namespaces) an existing subscription.
+    other parameters such as the namespaces) an existing subscription.  For "unifiedpush" the
+    endpoint plays the part of the token: re-subscribing with the same endpoint but new keys updates
+    the keys.
 
     Signatures:
 
@@ -142,6 +151,9 @@ def unsubscribe():
     }
 
     (or a list of such elements).
+
+    `service_info` must be the same value used to subscribe (for "unifiedpush" all three fields are
+    still validated, though only the endpoint identifies the subscription).
 
     The signature here is over the value:
 

@@ -113,3 +113,47 @@ retries = 0
 
 # Interval (seconds) between retry attempts
 retry_interval = 3
+
+
+[notify-unifiedpush]
+# UnifiedPush delivers Web Push (RFC 8030) messages to whatever push endpoint URL the device's
+# distributor app handed it (ntfy, NextPush, an FCM-backed distributor, ...), signed with VAPID
+# (RFC 8292).
+
+# PEM file containing the VAPID P-256 private key.  Required.  Generate one with:
+#
+#     ./make-vapid-key.py vapid_p256.pem
+#
+# which also prints the public key that clients pass to their distributor when registering
+# (`./make-vapid-key.py --show vapid_p256.pem` prints it again later).  Keep this key for good:
+# distributors that bind an endpoint to the VAPID key it was registered with reject pushes signed
+# with a different one, so replacing it means every UnifiedPush client has to re-register.
+#vapid_private_key = vapid_p256.pem
+
+# Contact for push service operators, sent as the VAPID `sub` claim.  Required; must be a mailto: or
+# https: URI.
+#vapid_contact = mailto:push-admin@example.org
+
+# How many times we retry a push that failed with a network error, 429 or 5xx.  Retries back off
+# exponentially from retry_interval, or wait as long as a Retry-After header asks (a request to wait
+# longer than 60 seconds drops the notification instead).
+retries = 2
+
+# Interval (seconds) before the first retry
+retry_interval = 5
+
+# Web Push TTL (seconds): how long the push service may hold the message for an offline device.
+# Never longer than the swarm message's own remaining lifetime.
+ttl = 86400
+
+# Connect and read timeout (seconds) for each push request
+timeout = 10
+
+# Maximum simultaneous push connections overall, and to any one push service host
+max_concurrent = 200
+max_per_host = 50
+
+# Allow endpoints whose host is a single-label or .localhost name, and connections to non-public
+# (private, loopback, link-local) addresses.  For testing against a local distributor only: with
+# this enabled any client can make the server POST to hosts on its internal network.
+#allow_private = no
